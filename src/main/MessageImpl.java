@@ -103,6 +103,7 @@ public class MessageImpl extends UnicastRemoteObject implements
 						break;
 					}
 				}
+				updateOnlineList();
 			}
 		}
 
@@ -126,7 +127,7 @@ public class MessageImpl extends UnicastRemoteObject implements
 				System.out.println("tmp unregister: clientwasn't registered.");
 			}
 		} else {
-			for (int i = 0; i < MessagingServer.clients.allClients.size(); i++) {
+			for (int i = 0; i < registeredClients.size(); i++) {
 
 				if (MessagingServer.clients.allClients.get(i).getUserName()
 						.equals(user)) {
@@ -137,6 +138,8 @@ public class MessageImpl extends UnicastRemoteObject implements
 					break;
 				}
 			}
+			updateOnlineList();
+			
 		}
 
 	}
@@ -180,5 +183,29 @@ public class MessageImpl extends UnicastRemoteObject implements
 				}
 			}
 		}
+	}
+	
+	private void updateOnlineList(){
+		for(int i = 0; i < registeredClients.size();i++){
+			ReturnInterface tmpClientObj = (ReturnInterface) registeredClients
+					.get(i);
+			try {
+				tmpClientObj.updateOnlineList(getOnlineList());
+			} catch (RemoteException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	private Vector<String> getOnlineList(){
+		Vector<String>whosOnline = new Vector<String>();
+		for (int i = 0; i < MessagingServer.clients.allClients.size(); i++) {
+			if(MessagingServer.clients.allClients.get(i).isOnline()){
+				whosOnline.add(MessagingServer.clients.allClients.get(i).getUserName());
+				System.out.println(MessagingServer.clients.allClients.get(i).getUserName());
+			}
+		}
+		return whosOnline;
 	}
 }
