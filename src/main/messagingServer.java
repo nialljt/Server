@@ -13,6 +13,7 @@ public class MessagingServer {
 		 clients = new Clients();
 		 clients.addToClients("niall", "test");
 		 clients.addToClients("mark", "test");
+		 clients.addToClients("barry", "test");
 		String registryUrl = "rmi://localhost:1109/messaging";
 		try {
 			startRegistry();
