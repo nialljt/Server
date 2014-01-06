@@ -4,7 +4,12 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 import java.util.Vector;
+
+import javax.swing.text.html.HTMLDocument.Iterator;
 
 import interfaces.MessagingInterface;
 import interfaces.ReturnInterface;
@@ -15,15 +20,18 @@ public class MessageImpl extends UnicastRemoteObject implements
 	private Vector<ReturnInterface> tmpRegisteredClients;
 	private Vector<ReturnInterface> registeredClients;
 
+	private HashMap hm = new HashMap();
+
 	public MessageImpl() throws RemoteException {
 		super();
 		registeredClients = new Vector<ReturnInterface>();
 		tmpRegisteredClients = new Vector<ReturnInterface>();
+
 	}
 
 	@Override
-	public void createMessage(String destination, String data, String sender)
-			throws RemoteException {
+	public synchronized void createMessage(String destination, String data,
+			String sender) throws RemoteException {
 		Message msg = new Message();
 		msg.createMessage(destination, data, sender);
 		MessagingServer.msgStore.addToQue(msg);
@@ -53,7 +61,7 @@ public class MessageImpl extends UnicastRemoteObject implements
 	}
 
 	@Override
-	public boolean login(String userName, String password)
+	public synchronized boolean login(String userName, String password)
 			throws RemoteException {
 		for (int i = 0; i < MessagingServer.clients.allClients.size(); i++) {
 			System.out.println("tmp");
@@ -67,111 +75,56 @@ public class MessageImpl extends UnicastRemoteObject implements
 				break;
 			}
 		}
-		System.out.println("Here");
 		return false;
 	}
 
 	@Override
-	public synchronized void registerWithServer(ReturnInterface clientObj,
-			boolean login, String user) throws RemoteException {
-		if (!login) {
-			if (!tmpRegisteredClients.contains(clientObj)) {
-				// Add the client to the list so they can get callback messages
-				tmpRegisteredClients.add(clientObj);
-				System.out.println("temp Registered client ");
-			} else {
-				System.out
-						.println("tmp Register failed - client was already registered.");
-			}
-		} else {
-			if (!registeredClients.contains(clientObj)) {
-				// Add the client to the list so they can get callback messages
-				registeredClients.add(clientObj);
-				System.out.println("Registered client ");
-			} else {
-				System.out
-						.println("Register failed - client was already registered.");
-			}
-			if (login = true) {
-				for (int i = 0; i < MessagingServer.clients.allClients.size(); i++) {
-					if (MessagingServer.clients.allClients.get(i).getUserName()
-							.equals(user)) {
-						MessagingServer.clients.allClients.get(i).setOnline(
-								true);
-						MessagingServer.clients.allClients.get(i).setLocation(
-								registeredClients.size());
-						break;
-					}
-				}
-				updateOnlineList();
-			}
-		}
+	public synchronized void tmpRegisterWithServer(ReturnInterface clientObj)
+			throws RemoteException {
 
+		if (!tmpRegisteredClients.contains(clientObj)) {
+			tmpRegisteredClients.add(clientObj);
+			System.out.println("temp Registered client ");
+		} else {
+			System.out
+					.println("tmp Register failed - client was already registered.");
+		}
 	}
 
 	@Override
-	public synchronized void unRegisterWithServerAndLogin(
-			ReturnInterface clientObj, boolean logout, String user)
+	public synchronized void tmpunRegisterWithServer(ReturnInterface clientObj)
 			throws RemoteException {
-
-		if (!logout) {
-			if (tmpRegisteredClients.contains(clientObj)) {
-
-				// Remove the client from the list so they don't get any more
-				// callback messages
-
-				tmpRegisteredClients.remove(clientObj);
-				System.out.println("Unregistered tmp client ");
-
-			} else {
-				System.out.println("tmp unregister: clientwasn't registered.");
-			}
+		if (tmpRegisteredClients.contains(clientObj)) {
+			// Remove the client from the list so they don't get any more
+			// callback messages
+			tmpRegisteredClients.remove(clientObj);
+			System.out.println("Unregistered tmp client ");
 		} else {
-			for (int i = 0; i < registeredClients.size(); i++) {
-
-				if (MessagingServer.clients.allClients.get(i).getUserName()
-						.equals(user)) {
-					MessagingServer.clients.allClients.get(i).setOnline(false);
-					MessagingServer.clients.allClients.get(i).setLocation(-1);
-					registeredClients.removeElementAt(i);
-					System.out.println("Unregistered client!!");
-					break;
-				}
-			}
-			updateOnlineList();
-			
+			System.out.println("tmp unregister: clientwasn't registered.");
 		}
-
 	}
 
 	public synchronized void sendMessage() {
 		if (MessagingServer.msgStore.que.size() > 0) {
 			Message tmpmsg = MessagingServer.msgStore.getMessageFromQue();
 			if (tmpmsg.destination.equalsIgnoreCase("ALL")) {
-				//for (int i = 0; i < MessagingServer.clients.allClients.size(); i++) {
-				for(int i = 0; i < registeredClients.size();i++){
-					if (i == 1
-							&& MessagingServer.clients.allClients.size() == 1) {
-
-					} else {
-						ReturnInterface tmpClientObj = (ReturnInterface) registeredClients
-								.get(i);
-						try {
-							tmpClientObj.recieveMessage(tmpmsg.data,
-									tmpmsg.sender + "~~ALL~~");
-						} catch (RemoteException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
+				for (Object obj : hm.keySet()) {
+					String key = obj.toString();
+					ReturnInterface tmpInter = (ReturnInterface) hm.get(key);
+					try {
+						tmpInter.recieveMessage(tmpmsg.data, tmpmsg.sender
+								+ "~~ALL~~");
+					} catch (RemoteException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
 					}
 				}
 			} else {
-				for (int i = 0; i < MessagingServer.clients.allClients.size(); i++) {
-
-					if (MessagingServer.clients.allClients.get(i).getUserName()
-							.equals(tmpmsg.destination)) {
-						ReturnInterface tmpClientObj = (ReturnInterface) registeredClients
-								.get(i);
+				for (Object obj : hm.keySet()) {
+					String key = obj.toString();
+					if (key.equals(tmpmsg.destination)) {
+						ReturnInterface tmpClientObj = (ReturnInterface) hm
+								.get(key);
 						try {
 							tmpClientObj.recieveMessage(tmpmsg.data,
 									tmpmsg.sender);
@@ -183,29 +136,42 @@ public class MessageImpl extends UnicastRemoteObject implements
 				}
 			}
 		}
+
 	}
-	
-	private void updateOnlineList(){
-		for(int i = 0; i < registeredClients.size();i++){
-			ReturnInterface tmpClientObj = (ReturnInterface) registeredClients
-					.get(i);
+
+	private synchronized void updateOnlineList() {
+		Vector<String> tmpVec = new Vector<String>();
+		for (Object obj : hm.keySet()) {
+			String key = obj.toString();
+			tmpVec.add(key);
+		}
+		for (Object obj : hm.keySet()) {
+			String key = obj.toString();
+			ReturnInterface tmpInter = (ReturnInterface) hm.get(key);
 			try {
-				tmpClientObj.updateOnlineList(getOnlineList());
-			} catch (RemoteException e) {
-				// TODO Auto-generated catch block
+				tmpInter.updateOnlineList(tmpVec);
+			}catch(Exception e){
 				e.printStackTrace();
 			}
 		}
 	}
+
 	
-	private Vector<String> getOnlineList(){
-		Vector<String>whosOnline = new Vector<String>();
-		for (int i = 0; i < MessagingServer.clients.allClients.size(); i++) {
-			if(MessagingServer.clients.allClients.get(i).isOnline()){
-				whosOnline.add(MessagingServer.clients.allClients.get(i).getUserName());
-				System.out.println(MessagingServer.clients.allClients.get(i).getUserName());
-			}
-		}
-		return whosOnline;
+
+	public synchronized void newUnregisterWithServer(String user)
+			throws RemoteException {
+		hm.remove(user);
+		createMessage("ALL", "Logged off!", user);
+		updateOnlineList();
 	}
+
+	public synchronized void newRegisterWithServer(ReturnInterface clientObj,
+			String user) throws RemoteException {
+		hm.put(user, clientObj);
+		createMessage("ALL", "Logged on!", user);
+		updateOnlineList();
+	}
+
+	
+
 }
